@@ -1,0 +1,119 @@
+<!-- Generated from i.hyper.lib_zenodo.md, which is the source of truth;
+     keep the two in sync. -->
+<h2>DESCRIPTION</h2>
+
+<p>
+<i>i.hyper.lib_zenodo</i> harvests curated spectral libraries published on <b>Zenodo</b> into the same shared, source-tagged, partitioned local spectral database used by <i>i.hyper.lib_ecosis</i>, <i>i.hyper.lib_gsti</i>, <i>i.hyper.lib_relab</i> and <i>i.hyper.lib_usgs</i>. The default store is <tt>$HOME/grassdata/hyperspeclib</tt>, written as Hive-partitioned Parquet under <tt>source_database=zenodo</tt>, with a <tt>_manifest.json</tt> so a second run is incremental.
+</p>
+
+<h3>Why this module exists</h3>
+
+<p>
+The five libraries already harvested are global or North American. Between them they hold almost no Mediterranean vegetation. A search of the local store for the species of a Provence site returned <b>4</b> spectra of <i>Quercus ilex</i>, <b>20</b> of <i>Quercus pubescens</i> and <b>10</b> of <i>Laurus nobilis</i>, and nothing at all for <i>Pinus halepensis</i>, <i>Olea europaea</i>, <i>Cupressus</i>, <i>Pistacia</i>, <i>Arbutus unedo</i>, <i>Cistus</i> or <i>Rosmarinus</i>.
+</p>
+
+<p>
+That matters more than a gap usually does. A spectral match always returns a nearest neighbour, so matching a Mediterranean canopy against a North American library does not return <i>no answer</i>: it returns a confident wrong one. The regional libraries that fill the gap are published as individual Zenodo records rather than as a single database, which is what this module is for.
+</p>
+
+<h3>The registry</h3>
+
+<p>
+Zenodo has no common spectral schema, so each dataset is read by its own reader and declared in a registry carrying its record id, licence, site, instrument and the species it actually contains, verified against the dataset&#x27;s own metadata rather than its abstract. Adding a library means adding a registry entry and a reader. Run with <b>-l</b> to print the registry.
+</p>
+
+<table border="1" cellpadding="4" cellspacing="0">
+<tr><th>Key</th><th>Record</th><th>Licence</th><th>Level</th><th>Species</th></tr>
+<tr><td><tt>mediterranean_woodlands</tt></td><td>5176824</td><td>CC-BY-4.0</td><td>canopy and leaf</td><td><i>Quercus suber</i>, <i>Cistus salviifolius</i>, <i>Ulex europaeus</i>, C3 grass mixture</td></tr>
+<tr><td><tt>montesinho</tt></td><td>10798148</td><td>CC-BY-4.0</td><td>leaf</td><td><i>Quercus rotundifolia</i>, <i>Quercus pyrenaica</i>, <i>Arbutus unedo</i>, <i>Cistus ladanifer</i>, <i>Erica arborea</i>, <i>Castanea sativa</i>, <i>Fraxinus angustifolia</i>, <i>Crataegus monogyna</i>, <i>Alnus glutinosa</i>, <i>Frangula alnus</i>, <i>Cytisus multiflorus</i>, <i>Genista falcata</i>, <i>Acacia dealbata</i>, <i>Dactylis glomerata</i>, <i>Trifolium repens</i></td></tr>
+</table>
+
+<p>
+Two points about what these contain. <b>974 of the 1216 observations</b> in <tt>mediterranean_woodlands</tt> are <i>canopy</i> rather than leaf measurements, which is the reason to prefer it: a drone crown is a canopy, and a laboratory leaf spectrum is not comparable to one. And <i>Quercus rotundifolia</i> in <tt>montesinho</tt> is the Iberian holm oak of the <i>Quercus ilex</i> complex, the nearest reference this harvest can offer to a Provence holm oak.
+</p>
+
+<h3>Where the species goes, and why it is said explicitly</h3>
+
+<p>
+Each spectrum carries its species in <tt>extra_metadata</tt> under the key <b><tt>species</tt></b>. That is the key the <tt>openspeclib</tt> loader reads to give a spectrum its material name, and writing it anywhere else loses the species between the store and the index. This is not hypothetical: the LOPEX93 and ANGERS records already in the store hold their species under <tt>Latin Name</tt>, which the loader does not read, so all <b>1212</b> of those named spectra reach the index carrying their dataset title instead and cannot be found by species.
+</p>
+
+<h2>NOTES</h2>
+
+<p>
+Downloads are cached in <tt>_cache/zenodo</tt> under the store root and reused on a later run. Each download is checked against the size Zenodo reports, because a truncated file is otherwise parsed into a silently incomplete library.
+</p>
+
+<p>
+A dataset already recorded in the manifest is skipped; pass <b>-f</b> to re-harvest it. Use <b>-n</b> to see what would be fetched without writing.
+</p>
+
+<p>
+As harvested, both datasets give a species to every spectrum: 538 of 538 for <tt>montesinho</tt> and 1216 of 1216 for <tt>mediterranean_woodlands</tt>. Six of the latter need recovering, because the 2012-03-10 session is missing from the dataset&#x27;s metadata table although its spectra are in the data file. Their species comes from the target <tt>ID</tt> instead, which is sound because species and measurement level are constant across all 27 targets, and each such row says so in <tt>species_source</tt> and is reported as a warning rather than passed off silently.
+</p>
+
+<p>
+One value in that dataset is not a taxon: <tt>c3mixture</tt>, a mixed C3 herbaceous sward, carried in the genus column. It is renamed to <tt>C3 grass mixture</tt> and marked <tt>is_taxon: false</tt> on its 251 rows, so a mixture is not matched against as though it named a plant.
+</p>
+
+<p>
+<tt>format=parquet</tt> needs <tt>pyarrow</tt>; <tt>format=sqlite</tt> has no extra dependency.
+</p>
+
+<p>
+These are <b>leaf and canopy reference</b> spectra of Iberian and Mediterranean flora, not of Provence itself. They narrow the gap; they do not close it. A match against them is still a match against another site&#x27;s plants, and the only thing that settles a species on the ground is identification in the field.
+</p>
+
+<h2>EXAMPLES</h2>
+
+<p>
+List the registry without downloading anything:
+</p>
+
+<pre>
+i.hyper.lib_zenodo -l
+</pre>
+
+<p>
+Harvest everything into the default shared store:
+</p>
+
+<pre>
+i.hyper.lib_zenodo
+</pre>
+
+<p>
+Harvest one dataset into a chosen store, as SQLite:
+</p>
+
+<pre>
+i.hyper.lib_zenodo dataset=montesinho output=$HOME/grassdata/hyperspeclib \
+    format=sqlite
+</pre>
+
+<p>
+Check what a record would cost before fetching it:
+</p>
+
+<pre>
+i.hyper.lib_zenodo record=5176824 -n
+</pre>
+
+<h2>SEE ALSO</h2>
+
+<p>
+<i><a href="i.hyper.lib_ecosis.md">i.hyper.lib_ecosis</a></i>, <i><a href="i.hyper.lib_gsti.md">i.hyper.lib_gsti</a></i>, <i><a href="i.hyper.lib_relab.md">i.hyper.lib_relab</a></i>, <i><a href="i.hyper.lib_usgs.md">i.hyper.lib_usgs</a></i>, <i><a href="i.hyper.speclookup.md">i.hyper.speclookup</a></i>, <i><a href="i.hyper.spectroscopy.md">i.hyper.spectroscopy</a></i>
+</p>
+
+<h2>REFERENCES</h2>
+
+<ul>
+<li>Cerasoli, S., Campagnolo, M., Faria, J., Nogueira, C., Caldeira, M.C. (2021). <i>Spectral library of vegetation from Mediterranean woodlands.</i> Zenodo. <a href="https://doi.org/10.5281/zenodo.5176824">https://doi.org/10.5281/zenodo.5176824</a> (CC-BY-4.0)</li>
+<li>Poças, I., et al. (2024). *Spectral Library of Plant Species from Montesinho Natural Park in Portugal.* Data 9(5), 65. <a href="https://doi.org/10.3390/data9050065">https://doi.org/10.3390/data9050065</a>; dataset <a href="https://doi.org/10.5281/zenodo.10798148">https://doi.org/10.5281/zenodo.10798148</a> (CC-BY-4.0)</li>
+</ul>
+
+<h2>AUTHORS</h2>
+
+<p>
+Spectral Feature Extraction and Interpretation Engine
+</p>
