@@ -47,6 +47,30 @@ i.hyper.lib_zenodo dataset=montesinho -f   # re-harvest
 dependency. Downloads are cached under `_cache/zenodo` in the store root and
 size-checked against what Zenodo reports.
 
+## How the harvest reaches a search index
+
+The store is only the first hop. `openspeclib` ingests each
+`source_database=` partition into its validated store, and `specserve`
+builds the resident index from that:
+
+```sh
+PYTHONPATH=~/dev/openspeclib/src python3 -m openspeclib.cli ingest \
+    --source hyperspeclib_zenodo --input ~/grassdata/hyperspeclib \
+    --output ~/grassdata/openspeclib/records
+PYTHONPATH=~/dev/openspeclib/src python3 -m openspeclib.cli combine \
+    --input ~/grassdata/openspeclib/records --output ~/grassdata/openspeclib
+python3 ~/dev/specserve/build_index.py \
+    --library ~/grassdata/openspeclib --out ~/grassdata/specserve
+python3 ~/dev/specserve/derive_matrices.py ~/grassdata/specserve
+```
+
+Two things that cost a failed run when this module was first written. The
+partition must carry `source_database` **as a column** as well as in the
+directory name, because the loader requests it explicitly and a partition
+without it fails to ingest with `KeyError: 'source_database'`. And the
+running server keeps its index memory-mapped, so it goes on serving the old
+one until it is restarted against the rebuilt directory.
+
 ## Adding a library
 
 Add an entry to `REGISTRY` with its record id, licence, species and file list,

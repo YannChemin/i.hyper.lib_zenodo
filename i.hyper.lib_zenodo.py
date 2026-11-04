@@ -527,7 +527,12 @@ def write_parquet(root, dataset_id, rows):
     os.makedirs(part, exist_ok=True)
     cols = {name: [r.get(name) for r in rows]
             for name, _ in _PARQUET_SCHEMA_FIELDS}
+    # source_database is both the partition directory and a column, as the
+    # other i.hyper.lib_* harvesters write it: openspeclib's loader requests
+    # it explicitly in its COLUMNS list, so a partition without the column
+    # fails to ingest with KeyError.
     table = pa.table({
+        "source_database": pa.array(cols["source_database"], type=pa.string()),
         "dataset_id": pa.array(cols["dataset_id"], type=pa.string()),
         "dataset_title": pa.array(cols["dataset_title"], type=pa.string()),
         "record_id": pa.array(cols["record_id"], type=pa.string()),
